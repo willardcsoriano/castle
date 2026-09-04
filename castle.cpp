@@ -1,4 +1,12 @@
 #include <GL/freeglut.h>
+#include <cstring>
+#include <vector>
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#include "third_party/stb_image_write.h"
+#pragma GCC diagnostic pop
 
 const int WIDTH = 512;
 const int HEIGHT = 412;
@@ -101,6 +109,26 @@ void display() {
     glutSwapBuffers();
 }
 
+void exportPng(const char *path) {
+    glClear(GL_COLOR_BUFFER_BIT);
+    drawCastle();
+    glFinish();
+
+    std::vector<unsigned char> pixels(WIDTH * HEIGHT * 3);
+    glReadBuffer(GL_BACK);
+    glReadPixels(0, 0, WIDTH, HEIGHT, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+
+    // OpenGL's origin is bottom-left; PNG rows go top-down, so flip vertically.
+    std::vector<unsigned char> flipped(WIDTH * HEIGHT * 3);
+    for (int y = 0; y < HEIGHT; ++y) {
+        std::memcpy(&flipped[y * WIDTH * 3],
+                    &pixels[(HEIGHT - 1 - y) * WIDTH * 3],
+                    WIDTH * 3);
+    }
+
+    stbi_write_png(path, WIDTH, HEIGHT, 3, flipped.data(), WIDTH * 3);
+}
+
 void reshape(int w, int h) {
     glViewport(0, 0, w, h);
     glMatrixMode(GL_PROJECTION);
@@ -118,6 +146,15 @@ int main(int argc, char **argv) {
     glClearColor(0.96f, 0.94f, 0.90f, 1.0f);
     glutDisplayFunc(display);
     glutReshapeFunc(reshape);
+    reshape(WIDTH, HEIGHT);
+
+    for (int i = 1; i < argc; ++i) {
+        if (std::strcmp(argv[i], "--export") == 0 && i + 1 < argc) {
+            exportPng(argv[i + 1]);
+            return 0;
+        }
+    }
+
     glutMainLoop();
     return 0;
 }
